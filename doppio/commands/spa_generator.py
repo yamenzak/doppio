@@ -1,6 +1,8 @@
 import click
 import subprocess
 import json
+import re
+import os
 
 from pathlib import Path
 from .boilerplates import *
@@ -170,37 +172,62 @@ export function cn(...inputs: ClassValue[]) {
 
 	def update_tsconfig_for_shadcn(self):
 		"""Update tsconfig.json and tsconfig.app.json for path aliases"""
+		
+		def clean_json_comments(content):
+			"""Remove comments and trailing commas from JSON-like content"""
+			# Remove single-line comments
+			content = re.sub(r'//.*', '', content)
+			# Remove multi-line comments
+			content = re.sub(r'/\*.*?\*/', '', content, flags=re.DOTALL)
+			# Remove trailing commas before closing braces/brackets
+			content = re.sub(r',(\s*[}\]])', r'\1', content)
+			return content
+		
 		# Update tsconfig.json
 		tsconfig_path = self.spa_path / "tsconfig.json"
 		if not tsconfig_path.exists():
 			create_file(tsconfig_path, TSCONFIG_JSON_BOILERPLATE)
 		else:
-			with tsconfig_path.open("r") as f:
-				tsconfig = json.load(f)
-			
-			if "compilerOptions" not in tsconfig:
-				tsconfig["compilerOptions"] = {}
-			
-			tsconfig["compilerOptions"]["baseUrl"] = "."
-			tsconfig["compilerOptions"]["paths"] = {"@/*": ["./src/*"]}
-			
-			with tsconfig_path.open("w") as f:
-				json.dump(tsconfig, f, indent=2)
+			try:
+				with tsconfig_path.open("r") as f:
+					content = f.read()
+				cleaned_content = clean_json_comments(content)
+				tsconfig = json.loads(cleaned_content)
+				
+				if "compilerOptions" not in tsconfig:
+					tsconfig["compilerOptions"] = {}
+				
+				tsconfig["compilerOptions"]["baseUrl"] = "."
+				tsconfig["compilerOptions"]["paths"] = {"@/*": ["./src/*"]}
+				
+				with tsconfig_path.open("w") as f:
+					json.dump(tsconfig, f, indent=2)
+			except json.JSONDecodeError as e:
+				click.echo(f"Warning: Could not parse tsconfig.json: {e}")
+				click.echo("Creating new tsconfig.json")
+				create_file(tsconfig_path, TSCONFIG_JSON_BOILERPLATE)
 		
 		# Update tsconfig.app.json
 		tsconfig_app_path = self.spa_path / "tsconfig.app.json"
 		if tsconfig_app_path.exists():
-			with tsconfig_app_path.open("r") as f:
-				tsconfig_app = json.load(f)
-			
-			if "compilerOptions" not in tsconfig_app:
-				tsconfig_app["compilerOptions"] = {}
-			
-			tsconfig_app["compilerOptions"]["baseUrl"] = "."
-			tsconfig_app["compilerOptions"]["paths"] = {"@/*": ["./src/*"]}
-			
-			with tsconfig_app_path.open("w") as f:
-				json.dump(tsconfig_app, f, indent=2)
+			try:
+				with tsconfig_app_path.open("r") as f:
+					content = f.read()
+				cleaned_content = clean_json_comments(content)
+				tsconfig_app = json.loads(cleaned_content)
+				
+				if "compilerOptions" not in tsconfig_app:
+					tsconfig_app["compilerOptions"] = {}
+				
+				tsconfig_app["compilerOptions"]["baseUrl"] = "."
+				tsconfig_app["compilerOptions"]["paths"] = {"@/*": ["./src/*"]}
+				
+				with tsconfig_app_path.open("w") as f:
+					json.dump(tsconfig_app, f, indent=2)
+			except json.JSONDecodeError as e:
+				click.echo(f"Warning: Could not parse tsconfig.app.json: {e}")
+				# Create a basic tsconfig.app.json with the needed config
+				create_file(tsconfig_app_path, TSCONFIG_APP_JSON_BOILERPLATE)
 
 	def create_vue_files(self):
 		app_vue = self.spa_path / "src/App.vue"
@@ -304,10 +331,13 @@ export function cn(...inputs: ClassValue[]) {
 			subprocess.run(
 				["yarn", "create", "vite", self.spa_name, "--template", "react-ts"],
 				cwd=self.app_path,
+				env={**os.environ, "YARN_ENABLE_IMMUTABLE_INSTALLS": "false"}
 			)
 		else:
 			subprocess.run(
-				["yarn", "create", "vite", self.spa_name, "--template", "react"], cwd=self.app_path
+				["yarn", "create", "vite", self.spa_name, "--template", "react"], 
+				cwd=self.app_path,
+				env={**os.environ, "YARN_ENABLE_IMMUTABLE_INSTALLS": "false"}
 			)
 
 		# Install dependencies
