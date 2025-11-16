@@ -209,14 +209,17 @@ AUTH_ROUTES_BOILERPLATE = """export default [
 ]
 """
 
+# React Boilerplates with Tailwind v4 and shadcn support
+
 REACT_VITE_CONFIG_BOILERPLATE = """import path from 'path';
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react'
+import react from '@vitejs/plugin-react';
+import tailwindcss from '@tailwindcss/vite';
 import proxyOptions from './proxyOptions';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-	plugins: [react()],
+	plugins: [react(), tailwindcss()],
 	server: {
 		port: 8080,
 		host: '0.0.0.0',
@@ -235,44 +238,259 @@ export default defineConfig({
 });
 """
 
-APP_REACT_BOILERPLATE = """import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import './App.css'
-import { FrappeProvider } from 'frappe-react-sdk'
-function App() {
-  const [count, setCount] = useState(0)
+APP_REACT_BOILERPLATE = """import { FrappeProvider } from 'frappe-react-sdk';
+import { Button } from "@/components/ui/button";
 
-  return (
-	<div className="App">
-	  <FrappeProvider>
-		<div>
-	  <div>
-		<a href="https://vitejs.dev" target="_blank">
-		  <img src="/vite.svg" className="logo" alt="Vite logo" />
-		</a>
-		<a href="https://reactjs.org" target="_blank">
-		  <img src={reactLogo} className="logo react" alt="React logo" />
-		</a>
-	  </div>
-	  <h1>Vite + React + Frappe</h1>
-	  <div className="card">
-		<button onClick={() => setCount((count) => count + 1)}>
-		  count is {count}
-		</button>
-		<p>
-		  Edit <code>src/App.jsx</code> and save to test HMR
-		</p>
-	  </div>
-	  <p className="read-the-docs">
-		Click on the Vite and React logos to learn more
-	  </p>
-	  </div>
-	  </FrappeProvider>
-	</div>
-  )
+const resolveSiteName = () => {
+	// @ts-ignore
+	if (window.frappe?.boot?.versions?.frappe && (window.frappe.boot.versions.frappe.startsWith('15') || window.frappe.boot.versions.frappe.startsWith('16'))) {
+		// @ts-ignore
+		return window.frappe?.boot?.sitename ?? import.meta.env.VITE_SITE_NAME;
+	}
+	return import.meta.env.VITE_SITE_NAME;
+};
+
+function App() {
+	return (
+		<FrappeProvider
+			socketPort={import.meta.env.VITE_SOCKET_PORT}
+			siteName={resolveSiteName()}
+		>
+			<div className="flex min-h-svh flex-col items-center justify-center">
+				<h1 className="text-3xl font-bold underline mb-4">
+					Vite + React + Frappe
+				</h1>
+				<Button>Click me</Button>
+				<p className="mt-4 text-muted-foreground">
+					Edit <code>src/App.tsx</code> and save to test HMR
+				</p>
+			</div>
+		</FrappeProvider>
+	);
 }
 
-export default App
+export default App;
+"""
+
+INDEX_CSS_BOILERPLATE = """@import "tailwindcss";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius: var(--radius);
+}
+
+:root {
+  --radius: 0.5rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.269 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.371 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+}
+"""
+
+ENV_LOCAL_BOILERPLATE = """VITE_BASE_PATH=
+VITE_SOCKET_PORT=9000
+VITE_SITE_NAME=TO_BE_FILLED_MANUALLY
+"""
+
+ENV_PRODUCTION_BOILERPLATE = """VITE_BASE_PATH=/{{name}}
+"""
+
+PYTHON_CONTEXT_BOILERPLATE = """import frappe
+import json
+import re
+
+no_cache = 1
+
+SCRIPT_TAG_PATTERN = re.compile(r"\<script[^<]*\</script\>")
+CLOSING_SCRIPT_TAG_PATTERN = re.compile(r"</script\>")
+
+def get_context(context):
+	if frappe.session.user == "Guest":
+		boot = frappe.website.utils.get_boot_data()
+	else:
+		try:
+			boot = frappe.sessions.get()
+		except Exception as e:
+			raise frappe.SessionBootFailed from e
+	
+	boot_json = frappe.as_json(boot, indent=None, separators=(",", ":"))
+	boot_json = SCRIPT_TAG_PATTERN.sub("", boot_json)
+	boot_json = CLOSING_SCRIPT_TAG_PATTERN.sub("", boot_json)
+	boot_json = json.dumps(boot_json)
+
+	context.update({
+		"build_version": frappe.utils.get_build_version(),
+		"boot": boot_json,
+	})
+
+	return context
+"""
+
+INDEX_HTML_BOILERPLATE = """<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + React + TS</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script>
+      window.frappe = {
+        session: { csrf_token: '{{ frappe.session.csrf_token }}' }
+      };
+      if (!window.frappe) { window.frappe = {}; }
+      window.frappe.boot = JSON.parse({{ boot | tojson }});
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+"""
+
+TSCONFIG_JSON_BOILERPLATE = """{
+  "files": [],
+  "references": [
+    {
+      "path": "./tsconfig.app.json"
+    },
+    {
+      "path": "./tsconfig.node.json"
+    }
+  ],
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  }
+}
+"""
+
+TSCONFIG_APP_JSON_BOILERPLATE = """{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* Path resolution */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}
+"""
+
+COMPONENTS_JSON_BOILERPLATE = """{
+  "$schema": "https://ui.shadcn.com/schema.json",
+  "style": "new-york",
+  "rsc": false,
+  "tsx": true,
+  "tailwind": {
+    "config": "",
+    "css": "src/index.css",
+    "baseColor": "neutral",
+    "cssVariables": true,
+    "prefix": ""
+  },
+  "aliases": {
+    "components": "@/components",
+    "utils": "@/lib/utils",
+    "ui": "@/components/ui",
+    "lib": "@/lib",
+    "hooks": "@/hooks"
+  },
+  "iconLibrary": "lucide"
+}
 """
 
 DESK_PAGE_JS_TEMPLATE = """frappe.pages["{{ page_name }}"].on_page_load = function (wrapper) {

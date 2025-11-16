@@ -1,5 +1,6 @@
 import click
 import subprocess
+import json
 
 from pathlib import Path
 from .boilerplates import *
@@ -11,7 +12,7 @@ from .utils import (
 
 
 class SPAGenerator:
-	def __init__(self, framework, spa_name, app, add_tailwindcss, typescript):
+	def __init__(self, framework, spa_name, app, add_tailwindcss, typescript, add_shadcn=False):
 		"""Initialize a new SPAGenerator instance"""
 		self.framework = framework
 		self.app = app
@@ -20,6 +21,7 @@ class SPAGenerator:
 		self.spa_path: Path = self.app_path / self.spa_name
 		self.add_tailwindcss = add_tailwindcss
 		self.use_typescript = typescript
+		self.add_shadcn = add_shadcn
 
 		self.validate_spa_name()
 
@@ -43,61 +45,162 @@ class SPAGenerator:
 			self.setup_proxy_options()
 			self.setup_react_vite_config()
 			self.create_react_files()
+			self.create_env_files()
+			self.create_python_context_file()
+			self.update_index_html()
+			
+			if self.add_shadcn:
+				self.setup_shadcn()
 
 		# Common to all frameworks
 		add_commands_to_root_package_json(self.app, self.spa_name)
 		self.create_www_directory()
-		self.add_csrf_to_html()
 
-		if self.add_tailwindcss:
-			self.setup_tailwindcss()
+		if self.add_tailwindcss and self.framework == "vue":
+			self.setup_tailwindcss_vue()
 
 		add_routing_rule_to_hooks(self.app, self.spa_name)
 
 		click.echo(f"Run: cd {self.spa_path.absolute().resolve()} && npm run dev")
 		click.echo("to start the development server and visit: http://<site>:8080")
 
-	def setup_tailwindcss(self):
-		# TODO: Convert to yarn command
-		# npm install -D tailwindcss@latest postcss@latest autoprefixer@latest
+	def setup_tailwindcss_vue(self):
+		# Install Tailwind v4 for Vue
 		subprocess.run(
 			[
 				"npm",
 				"install",
 				"-D",
 				"tailwindcss@latest",
-				"postcss@latest",
-				"autoprefixer@latest",
+				"@tailwindcss/vite@latest",
 			],
 			cwd=self.spa_path,
 		)
 
-		# npx tailwindcss init -p
-		subprocess.run(["npx", "tailwindcss", "init", "-p"], cwd=self.spa_path)
-
-		# Create an index.css file
+		# Create index.css with Tailwind v4 syntax
 		index_css_path: Path = self.spa_path / "src/index.css"
-
-		# Add boilerplate code
-		INDEX_CSS_BOILERPLATE = """@tailwind base;
-@tailwind components;
-@tailwind utilities;
-	"""
-
 		create_file(index_css_path, INDEX_CSS_BOILERPLATE)
 
-		# Populate content property in tailwind config file
-		# the extension of config can be .js or .ts, so we need to check for both
-		tailwind_config_path: Path = self.spa_path / "tailwind.config.js"
-		if not tailwind_config_path.exists():
-			tailwind_config_path = self.spa_path / "tailwind.config.ts"
+		# Update vite.config to include Tailwind plugin
+		vite_config_path = self.spa_path / ("vite.config.ts" if self.use_typescript else "vite.config.js")
+		content = vite_config_path.read_text()
+		
+		# Add tailwindcss import
+		if "import tailwindcss from '@tailwindcss/vite'" not in content:
+			content = content.replace(
+				"import vue from '@vitejs/plugin-vue';",
+				"import vue from '@vitejs/plugin-vue';\nimport tailwindcss from '@tailwindcss/vite';"
+			)
+			# Add to plugins array
+			content = content.replace(
+				"plugins: [vue()],",
+				"plugins: [vue(), tailwindcss()],"
+			)
+			vite_config_path.write_text(content)
 
-		tailwind_config_path: Path = self.spa_path / "tailwind.config.js"
-		tailwind_config = tailwind_config_path.read_text()
-		tailwind_config = tailwind_config.replace(
-			"content: [],", 'content: ["./src/**/*.{html,jsx,tsx,vue,js,ts}"],'
+	def create_env_files(self):
+		"""Create .env.local and .env.production files"""
+		env_local_path = self.spa_path / ".env.local"
+		env_production_path = self.spa_path / ".env.production"
+		
+		create_file(env_local_path, ENV_LOCAL_BOILERPLATE)
+		create_file(
+			env_production_path, 
+			ENV_PRODUCTION_BOILERPLATE.replace("{{name}}", self.spa_name)
 		)
-		tailwind_config_path.write_text(tailwind_config)
+		
+		click.echo(click.style(
+			f"\n⚠️  Important: Edit {env_local_path} and set VITE_SITE_NAME to your site name\n",
+			fg="yellow"
+		))
+
+	def create_python_context_file(self):
+		"""Create Python context file in www directory"""
+		www_path = self.app_path / self.app / "www"
+		context_file = www_path / f"{self.spa_name}.py"
+		
+		create_file(context_file, PYTHON_CONTEXT_BOILERPLATE)
+		click.echo(f"Created context file: {context_file}")
+
+	def update_index_html(self):
+		"""Update index.html with boot data injection"""
+		index_html_path = self.spa_path / "index.html"
+		
+		if index_html_path.exists():
+			# Replace entire content with new template
+			create_file(index_html_path, INDEX_HTML_BOILERPLATE)
+		else:
+			create_file(index_html_path, INDEX_HTML_BOILERPLATE)
+
+	def setup_shadcn(self):
+		"""Setup shadcn/ui for React with Tailwind v4"""
+		click.echo("Setting up shadcn/ui...")
+		
+		# Install required dependencies
+		subprocess.run(
+			["npm", "install", "class-variance-authority", "clsx", "tailwind-merge"],
+			cwd=self.spa_path,
+		)
+		
+		# Create lib/utils.ts
+		lib_dir = self.spa_path / "src/lib"
+		lib_dir.mkdir(exist_ok=True)
+		
+		utils_content = """import { clsx, type ClassValue } from "clsx"
+import { twMerge } from "tailwind-merge"
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs))
+}
+"""
+		create_file(lib_dir / "utils.ts", utils_content)
+		
+		# Create components.json
+		create_file(self.spa_path / "components.json", COMPONENTS_JSON_BOILERPLATE)
+		
+		# Update tsconfig files
+		self.update_tsconfig_for_shadcn()
+		
+		click.echo(click.style(
+			"\n✓ shadcn/ui setup complete!\n"
+			"  Run: npx shadcn@latest add button\n"
+			"  to add your first component\n",
+			fg="green"
+		))
+
+	def update_tsconfig_for_shadcn(self):
+		"""Update tsconfig.json and tsconfig.app.json for path aliases"""
+		# Update tsconfig.json
+		tsconfig_path = self.spa_path / "tsconfig.json"
+		if not tsconfig_path.exists():
+			create_file(tsconfig_path, TSCONFIG_JSON_BOILERPLATE)
+		else:
+			with tsconfig_path.open("r") as f:
+				tsconfig = json.load(f)
+			
+			if "compilerOptions" not in tsconfig:
+				tsconfig["compilerOptions"] = {}
+			
+			tsconfig["compilerOptions"]["baseUrl"] = "."
+			tsconfig["compilerOptions"]["paths"] = {"@/*": ["./src/*"]}
+			
+			with tsconfig_path.open("w") as f:
+				json.dump(tsconfig, f, indent=2)
+		
+		# Update tsconfig.app.json
+		tsconfig_app_path = self.spa_path / "tsconfig.app.json"
+		if tsconfig_app_path.exists():
+			with tsconfig_app_path.open("r") as f:
+				tsconfig_app = json.load(f)
+			
+			if "compilerOptions" not in tsconfig_app:
+				tsconfig_app["compilerOptions"] = {}
+			
+			tsconfig_app["compilerOptions"]["baseUrl"] = "."
+			tsconfig_app["compilerOptions"]["paths"] = {"@/*": ["./src/*"]}
+			
+			with tsconfig_app_path.open("w") as f:
+				json.dump(tsconfig_app, f, indent=2)
 
 	def create_vue_files(self):
 		app_vue = self.spa_path / "src/App.vue"
@@ -194,19 +297,6 @@ class SPAGenerator:
 		if not www_dir_path.exists():
 			www_dir_path.mkdir()
 
-	def add_csrf_to_html(self):
-		index_html_file_path = self.spa_path / "index.html"
-		with index_html_file_path.open("r") as f:
-			current_html = f.read()
-
-		# For attaching CSRF Token
-		updated_html = current_html.replace(
-			"</div>", "</div>\n\t\t<script>window.csrf_token = '{{ frappe.session.csrf_token }}';</script>"
-		)
-
-		with index_html_file_path.open("w") as f:
-			f.write(updated_html)
-
 	def initialize_react_vite_project(self):
 		# Run "yarn create vite {name} --template react"
 		print("Scaffolding React project...")
@@ -220,11 +310,22 @@ class SPAGenerator:
 				["yarn", "create", "vite", self.spa_name, "--template", "react"], cwd=self.app_path
 			)
 
-		# Install router and other npm packages
-		# yarn add frappe-react-sdk socket.io-client@4.5.1
+		# Install dependencies
 		print("Installing dependencies...")
+		
+		# Base dependencies
+		base_deps = ["frappe-react-sdk"]
+		
+		# Tailwind v4 dependencies
+		if self.add_tailwindcss:
+			base_deps.extend(["tailwindcss@next", "@tailwindcss/vite"])
+		
+		subprocess.run(["yarn", "add"] + base_deps, cwd=self.spa_path)
+		
+		# Dev dependencies
 		subprocess.run(
-			["yarn", "add", "frappe-react-sdk"], cwd=self.spa_path
+			["yarn", "add", "-D", "@types/node"],
+			cwd=self.spa_path
 		)
 
 	def setup_react_vite_config(self):
@@ -239,5 +340,11 @@ class SPAGenerator:
 			f.write(boilerplate)
 
 	def create_react_files(self):
+		# Create index.css with Tailwind v4
+		if self.add_tailwindcss:
+			index_css_path = self.spa_path / "src/index.css"
+			create_file(index_css_path, INDEX_CSS_BOILERPLATE)
+		
+		# Create App component
 		app_react = self.spa_path / ("src/App.tsx" if self.use_typescript else "src/App.jsx")
 		create_file(app_react, APP_REACT_BOILERPLATE)

@@ -13,25 +13,58 @@ from .desk_page import setup_desk_page
 @click.option(
     "--framework",
     type=click.Choice(["vue", "react"]),
-    default="vue",
+    default="react",
     prompt="Which framework do you want to use?",
     help="The framework to use for the SPA",
 )
 @click.option(
     "--typescript",
-    default=False,
+    default=True,
     prompt="Configure TypeScript?",
     is_flag=True,
     help="Configure with TypeScript",
 )
 @click.option(
-    "--tailwindcss", default=False, is_flag=True, help="Configure tailwindCSS"
+    "--tailwindcss", 
+    default=True, 
+    is_flag=True, 
+    help="Configure Tailwind CSS v4"
 )
-def generate_spa(framework, name, app, typescript, tailwindcss):
+@click.option(
+    "--shadcn",
+    default=False,
+    prompt="Setup shadcn/ui? (React only)",
+    is_flag=True,
+    help="Setup shadcn/ui component library (React + TypeScript + Tailwind required)"
+)
+def generate_spa(framework, name, app, typescript, tailwindcss, shadcn):
     if not app:
         click.echo("Please provide an app with --app")
         return
-    generator = SPAGenerator(framework, name, app, tailwindcss, typescript)
+    
+    # Validate shadcn requirements
+    if shadcn and framework != "react":
+        click.echo(click.style(
+            "⚠️  shadcn/ui is only available for React projects. Ignoring --shadcn flag.",
+            fg="yellow"
+        ))
+        shadcn = False
+    
+    if shadcn and not typescript:
+        click.echo(click.style(
+            "⚠️  shadcn/ui requires TypeScript. Enabling TypeScript.",
+            fg="yellow"
+        ))
+        typescript = True
+    
+    if shadcn and not tailwindcss:
+        click.echo(click.style(
+            "⚠️  shadcn/ui requires Tailwind CSS. Enabling Tailwind CSS.",
+            fg="yellow"
+        ))
+        tailwindcss = True
+    
+    generator = SPAGenerator(framework, name, app, tailwindcss, typescript, shadcn)
     generator.generate_spa()
 
 @click.command("add-desk-page")
